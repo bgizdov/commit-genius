@@ -1,0 +1,167 @@
+#!/usr/bin/env node
+
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+import * as fs from 'fs';
+
+// Load environment variables
+dotenv.config();
+
+const execAsync = promisify(exec);
+
+interface CommitMessageOptions {
+  dryRun?: boolean;
+}
+
+class AICommitGenerator {
+  private genAI: GoogleGenerativeAI;
+  private model: any;
+
+  constructor(apiKey: string) {
+    this.genAI = new GoogleGenerativeAI(apiKey);
+    // Use gemini-1.5-flash as it's more stable than the experimental version
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  }
+
+  async checkStagedChanges(): Promise<string> {
+    try {
+      const { stdout } = await execAsync('git diff --cached');
+      return stdout.trim();
+    } catch (error) {
+      throw new Error('Failed to get git diff. Make sure you are in a git repository.');
+    }
+  }
+
+  async generateCommitMessage(diff: string): Promise<string> {
+    const prompt = `
+You are an expert developer who writes clear, concise commit messages following conventional commit format.
+
+Analyze the following git diff and generate a single, well-formatted commit message.
+
+Rules:
+1. Use conventional commit format: type(scope): description
+2. Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build
+3. Keep the description under 50 characters for the first line
+4. Be specific about what changed
+5. Use present tense ("add" not "added")
+6. Don't include "git commit -m" or quotes
+7. Return ONLY the commit message, nothing else
+
+Git diff:
+${diff}
+
+Commit message:`;
+
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().trim();
+      
+      // Clean up the response to ensure it's just the commit message
+      const lines = text.split('\n');
+      const commitMessage = lines[0].trim();
+      
+      // Remove any potential quotes or prefixes
+      return commitMessage.replace(/^["']|["']$/g, '').replace(/^git commit -m\s*/, '');
+    } catch (error) {
+      throw new Error(`Failed to generate commit message: ${error}`);
+    }
+  }
+
+  async commitChanges(message: string): Promise<void> {
+    try {
+      await execAsync(`git commit -m "${message}"`);
+    } catch (error) {
+      throw new Error(`Failed to commit changes: ${error}`);
+    }
+  }
+
+  async run(options: CommitMessageOptions = {}): Promise<void> {
+    try {
+      console.log('🔍 Checking for staged changes...');
+      
+      const diff = await this.checkStagedChanges();
+      
+      if (!diff) {
+        console.log('❌ No staged changes found. Please stage your changes first with:');
+        console.log('   git add <files>');
+        process.exit(1);
+      }
+
+      console.log('🤖 Generating commit message with AI...');
+      
+      const commitMessage = await this.generateCommitMessage(diff);
+      
+      console.log('\n📝 Generated commit message:');
+      console.log(`   ${commitMessage}`);
+      
+      if (options.dryRun) {
+        console.log('\n🔍 Dry run mode - not committing changes');
+        return;
+      }
+
+      console.log('\n🚀 Committing changes...');
+      await this.commitChanges(commitMessage);
+      
+      console.log('✅ Successfully committed changes!');
+      
+    } catch (error) {
+      console.error('❌ Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  }
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const dryRun = args.includes('--dry-run') || args.includes('-d');
+  const help = args.includes('--help') || args.includes('-h');
+
+  if (help) {
+    console.log(`
+AI Commit Message Generator
+
+Usage:
+  ai-commit [options]
+  npm run commit [options]
+
+Options:
+  --dry-run, -d    Generate commit message without committing
+  --help, -h       Show this help message
+
+Environment:
+  GEMINI_API_KEY   Your Google Gemini API key (required)
+
+Examples:
+  ai-commit                    # Generate and commit
+  ai-commit --dry-run          # Generate message only
+  npm run commit               # Generate and commit
+`);
+    return;
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    console.error('❌ Error: GEMINI_API_KEY environment variable is required');
+    console.error('Please create a .env file with your Gemini API key:');
+    console.error('   GEMINI_API_KEY=your_api_key_here');
+    process.exit(1);
+  }
+
+  const generator = new AICommitGenerator(apiKey);
+  await generator.run({ dryRun });
+}
+
+// Run the main function
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('❌ Unexpected error:', error);
+    process.exit(1);
+  });
+}
+
+export { AICommitGenerator };
