@@ -14,16 +14,16 @@ const execAsync = promisify(exec);
 
 interface CommitMessageOptions {
   dryRun?: boolean;
+  model?: string;
 }
 
 class AICommitGenerator {
   private genAI: GoogleGenerativeAI;
   private model: any;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, modelName: string = 'gemini-2.5-flash-lite') {
     this.genAI = new GoogleGenerativeAI(apiKey);
-    // Use gemini-1.5-flash as it's more stable than the experimental version
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    this.model = this.genAI.getGenerativeModel({ model: modelName });
   }
 
   async checkStagedChanges(): Promise<string> {
@@ -120,6 +120,10 @@ async function main() {
   const dryRun = args.includes('--dry-run') || args.includes('-d');
   const help = args.includes('--help') || args.includes('-h');
 
+  // Parse model option
+  const modelIndex = args.findIndex(arg => arg === '--model' || arg === '-m');
+  const model = modelIndex !== -1 && args[modelIndex + 1] ? args[modelIndex + 1] : 'gemini-2.5-flash-lite';
+
   if (help) {
     console.log(`
 AI Commit Message Generator
@@ -129,16 +133,24 @@ Usage:
   npm run commit [options]
 
 Options:
-  --dry-run, -d    Generate commit message without committing
-  --help, -h       Show this help message
+  --dry-run, -d         Generate commit message without committing
+  --model, -m <model>   Specify Gemini model to use (default: gemini-2.5-flash-lite)
+  --help, -h            Show this help message
+
+Available Models:
+  gemini-2.5-flash-lite         # Default - Fast and efficient
+  gemini-2.5-flash              # Balanced performance
+  gemini-2.5-pro                # Most capable
+  gemini-2.5-flash-image-preview # With image support
 
 Environment:
   GEMINI_API_KEY   Your Google Gemini API key (required)
 
 Examples:
-  ai-commit                    # Generate and commit
-  ai-commit --dry-run          # Generate message only
-  npm run commit               # Generate and commit
+  ai-commit                              # Generate and commit (default model)
+  ai-commit --dry-run                    # Generate message only
+  ai-commit --model gemini-2.5-pro      # Use Pro model
+  npm run commit                         # Generate and commit
 `);
     return;
   }
@@ -152,8 +164,8 @@ Examples:
     process.exit(1);
   }
 
-  const generator = new AICommitGenerator(apiKey);
-  await generator.run({ dryRun });
+  const generator = new AICommitGenerator(apiKey, model);
+  await generator.run({ dryRun, model });
 }
 
 // Run the main function

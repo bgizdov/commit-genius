@@ -4,7 +4,7 @@ A TypeScript-based command-line tool that generates AI-powered commit messages u
 
 ## Features
 
-- 🤖 **AI-Powered**: Uses Google Gemini 1.5 Flash to generate contextually relevant commit messages
+- 🤖 **AI-Powered**: Uses Google Gemini 2.5 models to generate contextually relevant commit messages
 - 📝 **Conventional Commits**: Follows conventional commit message format (type(scope): description)
 - 🔍 **Context Aware**: Analyzes your actual git diff to understand what changed
 - ⚡ **Fast & Simple**: One command to generate and commit
@@ -74,6 +74,10 @@ ai-commit
 ai-commit --dry-run
 ai-commit -d
 
+# Use specific Gemini model
+ai-commit --model gemini-2.5-pro
+ai-commit -m gemini-2.5-flash
+
 # Show help
 ai-commit --help
 ai-commit -h
@@ -102,6 +106,30 @@ Output:
 
 🚀 Committing changes...
 ✅ Successfully committed changes!
+```
+
+## Available Gemini Models
+
+The tool supports multiple Gemini 2.5 models with different capabilities:
+
+| Model | Description | Use Case |
+|-------|-------------|----------|
+| `gemini-2.5-flash-lite` | **Default** - Fast and efficient | Quick commits, daily development |
+| `gemini-2.5-flash` | Balanced performance and quality | General purpose commit messages |
+| `gemini-2.5-pro` | Most capable and detailed | Complex changes, detailed analysis |
+| `gemini-2.5-flash-image-preview` | Includes image understanding | Projects with visual assets |
+
+### Model Selection Examples
+
+```bash
+# Use default model (flash-lite)
+ai-commit
+
+# Use Pro model for complex changes
+ai-commit --model gemini-2.5-pro
+
+# Use Flash for balanced performance
+ai-commit --model gemini-2.5-flash
 ```
 
 ## How It Works
