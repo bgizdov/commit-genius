@@ -30,10 +30,21 @@ class AICommitGenerator {
 
   async checkStagedChanges(): Promise<string> {
     try {
-      const { stdout } = await execAsync('git diff --cached');
-      return stdout.trim();
+      // Increase buffer size to handle large diffs (default is 1MB, setting to 10MB)
+      const { stdout } = await execAsync('git diff --cached', { maxBuffer: 1024 * 1024 * 10 });
+      const diff = stdout.trim();
+
+      // If diff is very large, truncate it intelligently for AI processing
+      const maxDiffLength = 50000; // ~50KB limit for AI processing
+      if (diff.length > maxDiffLength) {
+        console.log(`⚠️  Large diff detected (${Math.round(diff.length / 1024)}KB). Truncating for AI analysis...`);
+        const truncated = diff.substring(0, maxDiffLength);
+        return truncated + '\n\n[... diff truncated due to size ...]';
+      }
+
+      return diff;
     } catch (error) {
-      throw new Error('Failed to get git diff. Make sure you are in a git repository.');
+      throw new Error(`Failed to get git diff: ${error instanceof Error ? error.message : error}. Make sure you are in a git repository.`);
     }
   }
 
