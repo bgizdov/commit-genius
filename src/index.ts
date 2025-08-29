@@ -28,42 +28,97 @@ class AICommitGenerator {
     this.model = this.genAI.getGenerativeModel({ model: selectedModel });
   }
 
+  async getFileChangeSummary(): Promise<string> {
+    try {
+      // Get file change summary (much smaller than full diff)
+      const { stdout } = await execAsync('git diff --cached --name-status');
+      return stdout.trim();
+    } catch (error) {
+      throw new Error(`Failed to get file changes: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
   async checkStagedChanges(): Promise<string> {
     try {
-      // Increase buffer size to handle large diffs (default is 1MB, setting to 10MB)
-      const { stdout } = await execAsync('git diff --cached', { maxBuffer: 1024 * 1024 * 10 });
-      const diff = stdout.trim();
+      // First, get file change summary for large commits
+      const fileChanges = await this.getFileChangeSummary();
 
-      // If diff is very large, truncate it intelligently for AI processing
-      const maxDiffLength = 50000; // ~50KB limit for AI processing
-      if (diff.length > maxDiffLength) {
-        console.log(`⚠️  Large diff detected (${Math.round(diff.length / 1024)}KB). Truncating for AI analysis...`);
-        const truncated = diff.substring(0, maxDiffLength);
-        return truncated + '\n\n[... diff truncated due to size ...]';
+      if (!fileChanges) {
+        return '';
       }
 
-      return diff;
+      console.log('📁 Files changed:', fileChanges.split('\n').length);
+
+      // Try to get the full diff, but handle large diffs intelligently
+      try {
+        const { stdout } = await execAsync('git diff --cached', { maxBuffer: 1024 * 1024 * 10 });
+        const diff = stdout.trim();
+
+        // If diff is very large, use file summary + limited diff
+        const maxDiffLength = 30000; // ~30KB limit for AI processing
+        if (diff.length > maxDiffLength) {
+          console.log(`⚠️  Large diff detected (${Math.round(diff.length / 1024)}KB). Using file summary + limited diff for AI analysis...`);
+
+          // Get a more concise diff with just file names and stats
+          const { stdout: statDiff } = await execAsync('git diff --cached --stat');
+          const { stdout: shortDiff } = await execAsync('git diff --cached --name-only');
+
+          return `Files changed:
+${fileChanges}
+
+File statistics:
+${statDiff}
+
+Files modified:
+${shortDiff}
+
+Note: This is a large commit with ${Math.round(diff.length / 1024)}KB of changes.
+The commit message is generated based on file changes rather than detailed diff content.`;
+        }
+
+        return diff;
+      } catch (bufferError) {
+        // If diff is too large even with increased buffer, fall back to file summary
+        console.log('⚠️  Diff too large for processing. Using file change summary for AI analysis...');
+
+        const { stdout: statDiff } = await execAsync('git diff --cached --stat');
+
+        return `Files changed:
+${fileChanges}
+
+File statistics:
+${statDiff}
+
+Note: This is a very large commit. The commit message is generated based on file changes and statistics.`;
+      }
+
     } catch (error) {
       throw new Error(`Failed to get git diff: ${error instanceof Error ? error.message : error}. Make sure you are in a git repository.`);
     }
   }
 
   async generateCommitMessage(diff: string): Promise<string> {
+    const isFileSummary = diff.includes('Files changed:') || diff.includes('Note: This is a');
+
     const prompt = `
 You are an expert developer who writes clear, concise commit messages following conventional commit format.
 
-Analyze the following git diff and generate a single, well-formatted commit message.
+${isFileSummary ?
+  'Analyze the following file changes and statistics to generate a single, well-formatted commit message.' :
+  'Analyze the following git diff and generate a single, well-formatted commit message.'
+}
 
 Rules:
 1. Use conventional commit format: type(scope): description
 2. Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build
 3. Keep the description under 50 characters for the first line
-4. Be specific about what changed
+4. Be specific about what changed based on ${isFileSummary ? 'file names and change types' : 'the actual code changes'}
 5. Use present tense ("add" not "added")
 6. Don't include "git commit -m" or quotes
 7. Return ONLY the commit message, nothing else
+8. ${isFileSummary ? 'Focus on the overall purpose based on file patterns (e.g., "docs: add README files", "feat: add new components")' : 'Focus on the specific code changes'}
 
-Git diff:
+${isFileSummary ? 'File changes and statistics:' : 'Git diff:'}
 ${diff}
 
 Commit message:`;
