@@ -21,9 +21,11 @@ class AICommitGenerator {
   private genAI: GoogleGenerativeAI;
   private model: any;
 
-  constructor(apiKey: string, modelName: string = 'gemini-2.5-flash-lite') {
+  constructor(apiKey: string, modelName?: string) {
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: modelName });
+    // Precedence: provided modelName > GEMINI_MODEL env var > default
+    const selectedModel = modelName || process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+    this.model = this.genAI.getGenerativeModel({ model: selectedModel });
   }
 
   async checkStagedChanges(): Promise<string> {
@@ -120,9 +122,9 @@ async function main() {
   const dryRun = args.includes('--dry-run') || args.includes('-d');
   const help = args.includes('--help') || args.includes('-h');
 
-  // Parse model option
+  // Parse model option (CLI flag takes precedence over env var)
   const modelIndex = args.findIndex(arg => arg === '--model' || arg === '-m');
-  const model = modelIndex !== -1 && args[modelIndex + 1] ? args[modelIndex + 1] : 'gemini-2.5-flash-lite';
+  const model = modelIndex !== -1 && args[modelIndex + 1] ? args[modelIndex + 1] : undefined;
 
   if (help) {
     console.log(`
@@ -145,11 +147,12 @@ Available Models:
 
 Environment:
   GEMINI_API_KEY   Your Google Gemini API key (required)
+  GEMINI_MODEL     Default model to use (optional, default: gemini-2.5-flash-lite)
 
 Examples:
-  ai-commit                              # Generate and commit (default model)
+  ai-commit                              # Use model from GEMINI_MODEL env or default
   ai-commit --dry-run                    # Generate message only
-  ai-commit --model gemini-2.5-pro      # Use Pro model
+  ai-commit --model gemini-2.5-pro      # Override with Pro model
   npm run commit                         # Generate and commit
 `);
     return;

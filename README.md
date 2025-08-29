@@ -48,6 +48,7 @@ npm install -g .
 2. **Configure Environment**:
    - Copy `.env.example` to `.env`
    - Add your API key: `GEMINI_API_KEY=your_api_key_here`
+   - Optionally set your preferred model: `GEMINI_MODEL=gemini-2.5-pro`
 
 ## Usage
 
@@ -122,14 +123,39 @@ The tool supports multiple Gemini 2.5 models with different capabilities:
 ### Model Selection Examples
 
 ```bash
-# Use default model (flash-lite)
+# Use default model (flash-lite) or from GEMINI_MODEL env var
 ai-commit
 
-# Use Pro model for complex changes
+# Use Pro model for complex changes (overrides env var)
 ai-commit --model gemini-2.5-pro
 
 # Use Flash for balanced performance
 ai-commit --model gemini-2.5-flash
+```
+
+## Model Configuration
+
+You can configure your preferred model in three ways, with the following precedence order:
+
+1. **CLI Flag** (highest priority): `--model gemini-2.5-pro`
+2. **Environment Variable**: `GEMINI_MODEL=gemini-2.5-pro` in your `.env` file
+3. **Default**: `gemini-2.5-flash-lite` (if nothing else is specified)
+
+### Setting a Default Model
+
+To avoid specifying the model with every command, set it in your `.env` file:
+
+```bash
+# .env file
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=gemini-2.5-pro
+```
+
+Now `ai-commit` will use `gemini-2.5-pro` by default, but you can still override it:
+
+```bash
+ai-commit                              # Uses gemini-2.5-pro (from .env)
+ai-commit --model gemini-2.5-flash    # Overrides to use flash model
 ```
 
 ## How It Works
@@ -233,6 +259,7 @@ git add <files>
 ### "GEMINI_API_KEY environment variable is required"
 1. Create a `.env` file in the project root
 2. Add your API key: `GEMINI_API_KEY=your_key_here`
+3. Optionally set your preferred model: `GEMINI_MODEL=gemini-2.5-pro`
 
 ### "Failed to get git diff"
 Ensure you're in a git repository:
