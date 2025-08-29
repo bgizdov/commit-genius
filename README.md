@@ -211,3 +211,53 @@ Ensure you're in a git repository:
 ```bash
 git init  # If not already a git repo
 ```
+
+## Future Enhancements
+
+We're planning to expand the AI model support to give you more options for generating commit messages. Here's our roadmap:
+
+### 🤖 Additional AI Provider Support
+
+- [ ] **OpenAI Integration**
+  - [ ] GPT-4 support
+  - [ ] GPT-3.5-turbo support
+  - [ ] Configurable model selection
+
+- [ ] **DeepSeek Models**
+  - [ ] DeepSeek Coder integration
+  - [ ] DeepSeek Chat support
+
+- [ ] **Local LLM Support**
+  - [ ] Ollama integration for local models
+  - [ ] Support for popular local models (CodeLlama, Mistral, etc.)
+  - [ ] Offline commit message generation
+
+### 🔧 Configuration Enhancements
+
+- [ ] **Multi-provider Configuration**
+  - [ ] Provider selection via CLI flags (`--provider openai`)
+  - [ ] Default provider configuration in `.env`
+  - [ ] Fallback provider support
+
+- [ ] **Advanced Features**
+  - [ ] Custom commit message templates
+  - [ ] Multi-language commit messages
+  - [ ] Integration with conventional commit scopes
+  - [ ] Commit message history and learning
+
+### 📋 Planned Usage
+
+Once implemented, you'll be able to use different providers like:
+
+```bash
+# Use OpenAI GPT-4
+ai-commit --provider openai --model gpt-4
+
+# Use local Ollama model
+ai-commit --provider ollama --model codellama
+
+# Use DeepSeek
+ai-commit --provider deepseek --model deepseek-coder
+```
+
+**Note**: These features are planned for future releases. Currently, only Google Gemini is supported.
