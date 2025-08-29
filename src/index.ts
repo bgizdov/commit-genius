@@ -128,10 +128,10 @@ async function main() {
 
   if (help) {
     console.log(`
-AI Commit Message Generator
+Commit Genius
 
 Usage:
-  ai-commit [options]
+  genius [options]
   npm run commit [options]
 
 Options:
@@ -150,9 +150,9 @@ Environment:
   GEMINI_MODEL     Default model to use (optional, default: gemini-2.5-flash-lite)
 
 Examples:
-  ai-commit                              # Use model from GEMINI_MODEL env or default
-  ai-commit --dry-run                    # Generate message only
-  ai-commit --model gemini-2.5-pro      # Override with Pro model
+  genius                                 # Use model from GEMINI_MODEL env or default
+  genius --dry-run                       # Generate message only
+  genius --model gemini-2.5-pro         # Override with Pro model
   npm run commit                         # Generate and commit
 `);
     return;

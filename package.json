@@ -1,10 +1,10 @@
 {
-  "name": "ai-commit-message",
+  "name": "commit-genius",
   "version": "1.0.0",
   "description": "AI-powered commit message generator using Google Gemini",
   "main": "dist/index.js",
   "bin": {
-    "ai-commit": "dist/index.js"
+    "genius": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",

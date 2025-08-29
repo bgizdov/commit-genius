@@ -1,4 +1,4 @@
-# AI Commit Message Generator
+# Commit Genius
 
 A TypeScript-based command-line tool that generates AI-powered commit messages using Google's Gemini model and automatically commits your staged changes.
 
@@ -18,7 +18,7 @@ A TypeScript-based command-line tool that generates AI-powered commit messages u
 1. Clone or create the project:
 ```bash
 git clone <repository-url>
-cd ai-commit-message
+cd commit-genius
 ```
 
 2. Install dependencies:
@@ -65,23 +65,23 @@ git add .
 npm run commit
 
 # If installed globally
-ai-commit
+genius
 ```
 
 ### Options
 
 ```bash
 # Dry run - generate message without committing
-ai-commit --dry-run
-ai-commit -d
+genius --dry-run
+genius -d
 
 # Use specific Gemini model
-ai-commit --model gemini-2.5-pro
-ai-commit -m gemini-2.5-flash
+genius --model gemini-2.5-pro
+genius -m gemini-2.5-flash
 
 # Show help
-ai-commit --help
-ai-commit -h
+genius --help
+genius -h
 ```
 
 ### Example Workflow
@@ -124,13 +124,13 @@ The tool supports multiple Gemini 2.5 models with different capabilities:
 
 ```bash
 # Use default model (flash-lite) or from GEMINI_MODEL env var
-ai-commit
+genius
 
 # Use Pro model for complex changes (overrides env var)
-ai-commit --model gemini-2.5-pro
+genius --model gemini-2.5-pro
 
 # Use Flash for balanced performance
-ai-commit --model gemini-2.5-flash
+genius --model gemini-2.5-flash
 ```
 
 ## Model Configuration
@@ -151,11 +151,11 @@ GEMINI_API_KEY=your_api_key_here
 GEMINI_MODEL=gemini-2.5-pro
 ```
 
-Now `ai-commit` will use `gemini-2.5-pro` by default, but you can still override it:
+Now `genius` will use `gemini-2.5-pro` by default, but you can still override it:
 
 ```bash
-ai-commit                              # Uses gemini-2.5-pro (from .env)
-ai-commit --model gemini-2.5-flash    # Overrides to use flash model
+genius                                 # Uses gemini-2.5-pro (from .env)
+genius --model gemini-2.5-flash       # Overrides to use flash model
 ```
 
 ## How It Works
@@ -220,7 +220,7 @@ npm run dev
 ### Project Structure
 
 ```
-ai-commit-message/
+commit-genius/
 ├── src/
 │   └── index.ts          # Main CLI application
 ├── dist/                 # Compiled JavaScript (generated)
@@ -306,13 +306,13 @@ Once implemented, you'll be able to use different providers like:
 
 ```bash
 # Use OpenAI GPT-4
-ai-commit --provider openai --model gpt-4
+genius --provider openai --model gpt-4
 
 # Use local Ollama model
-ai-commit --provider ollama --model codellama
+genius --provider ollama --model codellama
 
 # Use DeepSeek
-ai-commit --provider deepseek --model deepseek-coder
+genius --provider deepseek --model deepseek-coder
 ```
 
 **Note**: These features are planned for future releases. Currently, only Google Gemini is supported.
