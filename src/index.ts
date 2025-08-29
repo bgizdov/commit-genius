@@ -6,11 +6,73 @@ import { promisify } from 'util';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 
 // Load environment variables
 dotenv.config();
 
 const execAsync = promisify(exec);
+
+interface Config {
+  apiKey?: string;
+  model?: string;
+}
+
+function loadGlobalConfig(): Config {
+  const configPaths = [
+    path.join(os.homedir(), '.commit-genius.json'),
+    path.join(os.homedir(), '.config', 'commit-genius', 'config.json'),
+    path.join(os.homedir(), '.config', 'commit-genius.json')
+  ];
+
+  for (const configPath of configPaths) {
+    try {
+      if (fs.existsSync(configPath)) {
+        const configContent = fs.readFileSync(configPath, 'utf8');
+        const config = JSON.parse(configContent);
+        console.log(`📄 Using config from: ${configPath}`);
+        return config;
+      }
+    } catch (error) {
+      console.warn(`⚠️  Warning: Failed to parse config file ${configPath}:`, error instanceof Error ? error.message : error);
+    }
+  }
+
+  return {};
+}
+
+function getApiKey(): string | undefined {
+  // Precedence: env vars > global config
+  return process.env.COMMIT_GENIUS_API_KEY ||
+         process.env.GEMINI_API_KEY ||
+         loadGlobalConfig().apiKey;
+}
+
+function getDefaultModel(): string {
+  // Precedence: env vars > global config > hardcoded default
+  return process.env.COMMIT_GENIUS_MODEL ||
+         process.env.GEMINI_MODEL ||
+         loadGlobalConfig().model ||
+         'gemini-2.5-flash-lite';
+}
+
+function createGlobalConfig(apiKey: string, model?: string): void {
+  const configPath = path.join(os.homedir(), '.commit-genius.json');
+  const config: Config = {
+    apiKey,
+    ...(model && { model })
+  };
+
+  try {
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    console.log(`✅ Global config created at: ${configPath}`);
+    console.log('📄 Config contents:');
+    console.log(JSON.stringify(config, null, 2));
+  } catch (error) {
+    console.error('❌ Failed to create config file:', error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}
 
 interface CommitMessageOptions {
   dryRun?: boolean;
@@ -23,11 +85,8 @@ class AICommitGenerator {
 
   constructor(apiKey: string, modelName?: string) {
     this.genAI = new GoogleGenerativeAI(apiKey);
-    // Precedence: provided modelName > COMMIT_GENIUS_MODEL env var > GEMINI_MODEL (legacy) > default
-    const selectedModel = modelName ||
-                         process.env.COMMIT_GENIUS_MODEL ||
-                         process.env.GEMINI_MODEL ||
-                         'gemini-2.5-flash-lite';
+    // Precedence: provided modelName > env vars > global config > default
+    const selectedModel = modelName || getDefaultModel();
     this.model = this.genAI.getGenerativeModel({ model: selectedModel });
   }
 
@@ -190,10 +249,27 @@ async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run') || args.includes('-d');
   const help = args.includes('--help') || args.includes('-h');
+  const init = args.includes('--init');
 
   // Parse model option (CLI flag takes precedence over env var)
   const modelIndex = args.findIndex(arg => arg === '--model' || arg === '-m');
   const model = modelIndex !== -1 && args[modelIndex + 1] ? args[modelIndex + 1] : undefined;
+
+  if (init) {
+    console.log('🔧 Creating global config file...');
+    console.log('');
+
+    // Simple prompt for API key (in a real implementation, you might want to use a proper prompt library)
+    console.log('Please provide your Gemini API key:');
+    console.log('Get it from: https://makersuite.google.com/app/apikey');
+    console.log('');
+    console.log('You can also create the file manually at ~/.commit-genius.json:');
+    console.log('{');
+    console.log('  "apiKey": "your_gemini_api_key_here",');
+    console.log('  "model": "gemini-2.5-flash-lite"');
+    console.log('}');
+    return;
+  }
 
   if (help) {
     console.log(`
@@ -206,6 +282,7 @@ Usage:
 Options:
   --dry-run, -d         Generate commit message without committing
   --model, -m <model>   Specify Gemini model to use (default: gemini-2.5-flash-lite)
+  --init                Create global config file (~/.commit-genius.json)
   --help, -h            Show this help message
 
 Available Models:
@@ -214,13 +291,16 @@ Available Models:
   gemini-2.5-pro                # Most capable
   gemini-2.5-flash-image-preview # With image support
 
-Environment:
-  COMMIT_GENIUS_API_KEY    Your Google Gemini API key (required)
-  COMMIT_GENIUS_MODEL      Default model to use (optional, default: gemini-2.5-flash-lite)
-
-  Legacy (still supported):
-  GEMINI_API_KEY          Your Google Gemini API key (deprecated, use COMMIT_GENIUS_API_KEY)
-  GEMINI_MODEL            Default model (deprecated, use COMMIT_GENIUS_MODEL)
+Configuration (in order of precedence):
+  1. CLI flags (--model)
+  2. Environment variables:
+     COMMIT_GENIUS_API_KEY    Your Google Gemini API key (required)
+     COMMIT_GENIUS_MODEL      Default model to use (optional)
+  3. Global config file (~/.commit-genius.json):
+     { "apiKey": "your_key", "model": "gemini-2.5-pro" }
+  4. Legacy environment variables (still supported):
+     GEMINI_API_KEY          Your Google Gemini API key
+     GEMINI_MODEL            Default model
 
 Examples:
   genius                                 # Use model from GEMINI_MODEL env or default
@@ -231,17 +311,24 @@ Examples:
     return;
   }
 
-  const apiKey = process.env.COMMIT_GENIUS_API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = getApiKey();
 
   if (!apiKey) {
-    console.error('❌ Error: API key environment variable is required');
+    console.error('❌ Error: API key is required');
     console.error('Please set your Gemini API key using one of these methods:');
     console.error('');
-    console.error('Preferred (new):');
-    console.error('   COMMIT_GENIUS_API_KEY=your_api_key_here');
+    console.error('1. Environment variables:');
+    console.error('   export COMMIT_GENIUS_API_KEY="your_api_key_here"');
+    console.error('   export GEMINI_API_KEY="your_api_key_here"  # Legacy');
     console.error('');
-    console.error('Legacy (still supported):');
-    console.error('   GEMINI_API_KEY=your_api_key_here');
+    console.error('2. Global config file (~/.commit-genius.json):');
+    console.error('   {');
+    console.error('     "apiKey": "your_api_key_here",');
+    console.error('     "model": "gemini-2.5-flash-lite"');
+    console.error('   }');
+    console.error('');
+    console.error('3. Local .env file (for project-specific setup):');
+    console.error('   COMMIT_GENIUS_API_KEY=your_api_key_here');
     process.exit(1);
   }
 
