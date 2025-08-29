@@ -23,8 +23,11 @@ class AICommitGenerator {
 
   constructor(apiKey: string, modelName?: string) {
     this.genAI = new GoogleGenerativeAI(apiKey);
-    // Precedence: provided modelName > GEMINI_MODEL env var > default
-    const selectedModel = modelName || process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+    // Precedence: provided modelName > COMMIT_GENIUS_MODEL env var > GEMINI_MODEL (legacy) > default
+    const selectedModel = modelName ||
+                         process.env.COMMIT_GENIUS_MODEL ||
+                         process.env.GEMINI_MODEL ||
+                         'gemini-2.5-flash-lite';
     this.model = this.genAI.getGenerativeModel({ model: selectedModel });
   }
 
@@ -212,8 +215,12 @@ Available Models:
   gemini-2.5-flash-image-preview # With image support
 
 Environment:
-  GEMINI_API_KEY   Your Google Gemini API key (required)
-  GEMINI_MODEL     Default model to use (optional, default: gemini-2.5-flash-lite)
+  COMMIT_GENIUS_API_KEY    Your Google Gemini API key (required)
+  COMMIT_GENIUS_MODEL      Default model to use (optional, default: gemini-2.5-flash-lite)
+
+  Legacy (still supported):
+  GEMINI_API_KEY          Your Google Gemini API key (deprecated, use COMMIT_GENIUS_API_KEY)
+  GEMINI_MODEL            Default model (deprecated, use COMMIT_GENIUS_MODEL)
 
 Examples:
   genius                                 # Use model from GEMINI_MODEL env or default
@@ -224,11 +231,16 @@ Examples:
     return;
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  
+  const apiKey = process.env.COMMIT_GENIUS_API_KEY || process.env.GEMINI_API_KEY;
+
   if (!apiKey) {
-    console.error('❌ Error: GEMINI_API_KEY environment variable is required');
-    console.error('Please create a .env file with your Gemini API key:');
+    console.error('❌ Error: API key environment variable is required');
+    console.error('Please set your Gemini API key using one of these methods:');
+    console.error('');
+    console.error('Preferred (new):');
+    console.error('   COMMIT_GENIUS_API_KEY=your_api_key_here');
+    console.error('');
+    console.error('Legacy (still supported):');
     console.error('   GEMINI_API_KEY=your_api_key_here');
     process.exit(1);
   }

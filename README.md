@@ -42,11 +42,11 @@ npm install -g .
 
 ```bash
 # Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
-export GEMINI_API_KEY="your_gemini_api_key_here"
-export GEMINI_MODEL="gemini-2.5-flash-lite"  # Optional: set default model
+export COMMIT_GENIUS_API_KEY="your_gemini_api_key_here"
+export COMMIT_GENIUS_MODEL="gemini-2.5-flash-lite"  # Optional: set default model
 
 # Or set temporarily for current session
-export GEMINI_API_KEY="your_gemini_api_key_here"
+export COMMIT_GENIUS_API_KEY="your_gemini_api_key_here"
 ```
 
 ## Setup
@@ -60,15 +60,15 @@ export GEMINI_API_KEY="your_gemini_api_key_here"
 
    **For Local Installation:**
    - Copy `.env.example` to `.env`
-   - Add your API key: `GEMINI_API_KEY=your_api_key_here`
-   - Optionally set your preferred model: `GEMINI_MODEL=gemini-2.5-pro`
+   - Add your API key: `COMMIT_GENIUS_API_KEY=your_api_key_here`
+   - Optionally set your preferred model: `COMMIT_GENIUS_MODEL=gemini-2.5-pro`
 
    **For Global Installation:**
    - Export environment variables in your shell:
    ```bash
    # Add to ~/.bashrc, ~/.zshrc, or ~/.bash_profile
-   export GEMINI_API_KEY="your_gemini_api_key_here"
-   export GEMINI_MODEL="gemini-2.5-pro"  # Optional
+   export COMMIT_GENIUS_API_KEY="your_gemini_api_key_here"
+   export COMMIT_GENIUS_MODEL="gemini-2.5-pro"  # Optional
 
    # Then reload your shell or run:
    source ~/.zshrc  # or ~/.bashrc
@@ -81,10 +81,10 @@ export GEMINI_API_KEY="your_gemini_api_key_here"
 If you installed globally, make sure your API key is exported:
 ```bash
 # Check if API key is set
-echo $GEMINI_API_KEY
+echo $COMMIT_GENIUS_API_KEY
 
 # If not set, export it
-export GEMINI_API_KEY="your_api_key_here"
+export COMMIT_GENIUS_API_KEY="your_api_key_here"
 
 # Then use anywhere
 cd /path/to/your/project
@@ -187,8 +187,8 @@ To avoid specifying the model with every command, set it in your `.env` file:
 
 ```bash
 # .env file
-GEMINI_API_KEY=your_api_key_here
-GEMINI_MODEL=gemini-2.5-pro
+COMMIT_GENIUS_API_KEY=your_api_key_here
+COMMIT_GENIUS_MODEL=gemini-2.5-pro
 ```
 
 Now `genius` will use `gemini-2.5-pro` by default, but you can still override it:
@@ -296,24 +296,27 @@ Make sure to stage your changes first:
 git add <files>
 ```
 
-### "GEMINI_API_KEY environment variable is required"
+### "API key environment variable is required"
 
 **For Local Installation:**
 1. Create a `.env` file in the project root
-2. Add your API key: `GEMINI_API_KEY=your_key_here`
-3. Optionally set your preferred model: `GEMINI_MODEL=gemini-2.5-pro`
+2. Add your API key: `COMMIT_GENIUS_API_KEY=your_key_here`
+3. Optionally set your preferred model: `COMMIT_GENIUS_MODEL=gemini-2.5-pro`
 
 **For Global Installation:**
 1. Export the environment variable:
 ```bash
-export GEMINI_API_KEY="your_key_here"
-export GEMINI_MODEL="gemini-2.5-pro"  # Optional
+export COMMIT_GENIUS_API_KEY="your_key_here"
+export COMMIT_GENIUS_MODEL="gemini-2.5-pro"  # Optional
 ```
 2. Add to your shell profile to make it permanent:
 ```bash
-echo 'export GEMINI_API_KEY="your_key_here"' >> ~/.zshrc
+echo 'export COMMIT_GENIUS_API_KEY="your_key_here"' >> ~/.zshrc
 source ~/.zshrc
 ```
+
+**Legacy Support:**
+The old `GEMINI_API_KEY` and `GEMINI_MODEL` variables still work for backward compatibility, but `COMMIT_GENIUS_*` variables take precedence.
 
 ### "Failed to get git diff"
 Ensure you're in a git repository:
