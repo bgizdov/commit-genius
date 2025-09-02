@@ -16,6 +16,8 @@ const execAsync = promisify(exec);
 interface Config {
   apiKey?: string;
   model?: string;
+  prefixFormat?: 'brackets' | 'colon';
+  autoPrefixFromBranch?: boolean;
 }
 
 function loadGlobalConfig(): Config {
@@ -56,6 +58,100 @@ function getDefaultModel(): string {
          'gemini-2.5-flash-lite';
 }
 
+async function getCurrentBranch(): Promise<string | null> {
+  try {
+    const { stdout } = await execAsync('git branch --show-current');
+    return stdout.trim() || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function extractPrefixFromBranch(branchName: string): string | null {
+  // Common patterns for extracting prefix from branch names
+  const patterns = [
+    /^(?:feature|bugfix|hotfix|chore)\/([A-Z]+-\d+)/i,  // feature/JR-1234-description
+    /^([A-Z]+-\d+)/i,                                   // JR-1234 or JR-1234-description
+    /^(?:feature|bugfix|hotfix|chore)\/([A-Z]+\d+)/i,  // feature/PROJ567-description
+    /^([A-Z]+\d+)/i                                     // PROJ567
+  ];
+
+  for (const pattern of patterns) {
+    const match = branchName.match(pattern);
+    if (match) {
+      return match[1].toUpperCase();
+    }
+  }
+
+  return null;
+}
+
+function validatePrefix(prefix: string): { valid: boolean; message?: string } {
+  // Basic validation for common prefix formats
+  const validPatterns = [
+    /^[A-Z]+-\d+$/,     // JR-1234, PROJ-567
+    /^[A-Z]+\d+$/,      // PROJ567, JR1234
+    /^#\d+$/,           // #123 (GitHub issues)
+    /^[A-Z]{2,}-\d+$/   // JIRA-1234
+  ];
+
+  const isValid = validPatterns.some(pattern => pattern.test(prefix));
+
+  if (!isValid) {
+    return {
+      valid: false,
+      message: `Prefix "${prefix}" doesn't match common patterns (e.g., JR-1234, PROJ567, #123)`
+    };
+  }
+
+  return { valid: true };
+}
+
+async function getPrefix(cliPrefix?: string): Promise<string | null> {
+  // Precedence: CLI flag > branch detection > none
+
+  // 1. CLI flag (highest priority)
+  if (cliPrefix) {
+    const validation = validatePrefix(cliPrefix);
+    if (!validation.valid) {
+      console.warn(`⚠️  ${validation.message}`);
+    }
+    return cliPrefix;
+  }
+
+  // 2. Branch detection (if enabled in config or by default)
+  const config = loadGlobalConfig();
+  const autoPrefixFromBranch = config.autoPrefixFromBranch !== false; // Default to true
+  if (autoPrefixFromBranch) {
+    const currentBranch = await getCurrentBranch();
+    if (currentBranch) {
+      const branchPrefix = extractPrefixFromBranch(currentBranch);
+      if (branchPrefix) {
+        console.log(`🌿 Auto-detected prefix from branch "${currentBranch}": ${branchPrefix}`);
+        return branchPrefix;
+      }
+    }
+  }
+
+  // 3. No prefix
+  return null;
+}
+
+function formatCommitMessage(message: string, prefix: string | null, format: 'brackets' | 'colon' = 'brackets'): string {
+  if (!prefix) {
+    return message;
+  }
+
+  switch (format) {
+    case 'brackets':
+      return `[${prefix}] ${message}`;
+    case 'colon':
+      return `${prefix}: ${message}`;
+    default:
+      return `[${prefix}] ${message}`;
+  }
+}
+
 function createGlobalConfig(apiKey: string, model?: string): void {
   const configPath = path.join(os.homedir(), '.commit-genius.json');
   const config: Config = {
@@ -77,6 +173,7 @@ function createGlobalConfig(apiKey: string, model?: string): void {
 interface CommitMessageOptions {
   dryRun?: boolean;
   model?: string;
+  prefix?: string;
 }
 
 class AICommitGenerator {
@@ -212,9 +309,9 @@ Commit message:`;
   async run(options: CommitMessageOptions = {}): Promise<void> {
     try {
       console.log('🔍 Checking for staged changes...');
-      
+
       const diff = await this.checkStagedChanges();
-      
+
       if (!diff) {
         console.log('❌ No staged changes found. Please stage your changes first with:');
         console.log('   git add <files>');
@@ -222,22 +319,33 @@ Commit message:`;
       }
 
       console.log('🤖 Generating commit message with AI...');
-      
-      const commitMessage = await this.generateCommitMessage(diff);
-      
+
+      let commitMessage = await this.generateCommitMessage(diff);
+
+      // Get prefix and apply it to the commit message
+      const prefix = await getPrefix(options.prefix);
+      const config = loadGlobalConfig();
+      const prefixFormat = config.prefixFormat || 'brackets';
+
+      const finalMessage = formatCommitMessage(commitMessage, prefix, prefixFormat);
+
       console.log('\n📝 Generated commit message:');
-      console.log(`   ${commitMessage}`);
-      
+      console.log(`   ${finalMessage}`);
+
+      if (prefix) {
+        console.log(`🏷️  Applied prefix: ${prefix} (format: ${prefixFormat})`);
+      }
+
       if (options.dryRun) {
         console.log('\n🔍 Dry run mode - not committing changes');
         return;
       }
 
       console.log('\n🚀 Committing changes...');
-      await this.commitChanges(commitMessage);
-      
+      await this.commitChanges(finalMessage);
+
       console.log('✅ Successfully committed changes!');
-      
+
     } catch (error) {
       console.error('❌ Error:', error instanceof Error ? error.message : error);
       process.exit(1);
@@ -255,6 +363,10 @@ async function main() {
   const modelIndex = args.findIndex(arg => arg === '--model' || arg === '-m');
   const model = modelIndex !== -1 && args[modelIndex + 1] ? args[modelIndex + 1] : undefined;
 
+  // Parse prefix option
+  const prefixIndex = args.findIndex(arg => arg === '--prefix' || arg === '-p');
+  const cliPrefix = prefixIndex !== -1 && args[prefixIndex + 1] ? args[prefixIndex + 1] : undefined;
+
   if (init) {
     console.log('🔧 Creating global config file...');
     console.log('');
@@ -266,8 +378,13 @@ async function main() {
     console.log('You can also create the file manually at ~/.commit-genius.json:');
     console.log('{');
     console.log('  "apiKey": "your_gemini_api_key_here",');
-    console.log('  "model": "gemini-2.5-flash-lite"');
+    console.log('  "model": "gemini-2.5-flash-lite",');
+    console.log('  "prefixFormat": "brackets",');
+    console.log('  "autoPrefixFromBranch": true');
     console.log('}');
+    console.log('');
+    console.log('Note: Prefixes are dynamic per commit, not stored in config.');
+    console.log('Use --prefix flag or branch naming conventions.');
     return;
   }
 
@@ -282,6 +399,7 @@ Usage:
 Options:
   --dry-run, -d         Generate commit message without committing
   --model, -m <model>   Specify Gemini model to use (default: gemini-2.5-flash-lite)
+  --prefix, -p <prefix> Prepend prefix to commit message (e.g., JR-1234)
   --init                Create global config file (~/.commit-genius.json)
   --help, -h            Show this help message
 
@@ -292,20 +410,28 @@ Available Models:
   gemini-2.5-flash-image-preview # With image support
 
 Configuration (in order of precedence):
-  1. CLI flags (--model)
+  1. CLI flags (--model, --prefix)
   2. Environment variables:
      COMMIT_GENIUS_API_KEY    Your Google Gemini API key (required)
      COMMIT_GENIUS_MODEL      Default model to use (optional)
   3. Global config file (~/.commit-genius.json):
-     { "apiKey": "your_key", "model": "gemini-2.5-pro" }
-  4. Legacy environment variables (still supported):
+     { "apiKey": "your_key", "model": "gemini-2.5-pro", "prefixFormat": "brackets" }
+  4. Branch detection (auto-extract from branch name like feature/JR-1234-desc)
+  5. Legacy environment variables (still supported):
      GEMINI_API_KEY          Your Google Gemini API key
      GEMINI_MODEL            Default model
 
+Prefix Configuration:
+  --prefix, -p             Per-commit prefix (e.g., JR-1234, PROJ-567)
+  Branch detection         Automatic extraction from branch names
+  No static config         Prefixes are dynamic, not stored in config files
+
 Examples:
-  genius                                 # Use model from GEMINI_MODEL env or default
+  genius                                 # Auto-detect prefix from branch, use default model
   genius --dry-run                       # Generate message only
+  genius --prefix "JR-1234"              # Add specific prefix to this commit
   genius --model gemini-2.5-pro         # Override with Pro model
+  genius -p "PROJ-567" -m gemini-2.5-pro # Custom prefix and model for this commit
   npm run commit                         # Generate and commit
 `);
     return;
@@ -324,7 +450,8 @@ Examples:
     console.error('2. Global config file (~/.commit-genius.json):');
     console.error('   {');
     console.error('     "apiKey": "your_api_key_here",');
-    console.error('     "model": "gemini-2.5-flash-lite"');
+    console.error('     "model": "gemini-2.5-flash-lite",');
+    console.error('     "prefixFormat": "brackets"');
     console.error('   }');
     console.error('');
     console.error('3. Local .env file (for project-specific setup):');
@@ -333,7 +460,7 @@ Examples:
   }
 
   const generator = new AICommitGenerator(apiKey, model);
-  await generator.run({ dryRun, model });
+  await generator.run({ dryRun, model, prefix: cliPrefix });
 }
 
 // Run the main function
