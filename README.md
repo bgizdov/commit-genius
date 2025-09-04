@@ -149,6 +149,55 @@ Output:
 ✅ Successfully committed changes!
 ```
 
+## Shell Aliases
+
+For even faster workflow, you can create shell aliases that combine `git add .` and `genius`:
+
+### Recommended Aliases
+
+Add any of these to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.):
+
+```bash
+# Short and sweet
+alias ag="git add . && genius"          # "add genius"
+alias gadd="git add . && genius"        # "git add genius"
+
+# Creative and memorable
+alias magic="git add . && genius"       # Magic commit
+alias brain="git add . && genius"       # Brain-powered commit
+alias ai="git add . && genius"          # AI commit
+alias zen="git add . && genius"         # Zen commit
+```
+
+### Usage with Aliases
+
+```bash
+# Make your changes
+echo "new feature" >> app.js
+
+# One command to stage and commit with AI
+ag          # or magic, brain, ai, zen, gadd
+
+# Output:
+# 🔍 Checking for staged changes...
+# 🌿 Auto-detected prefix from branch "feature/JR-1234-add-auth": JR-1234
+# 🤖 Generating commit message with AI...
+# 📝 Generated commit message: [JR-1234] feat: add new authentication feature
+# 🚀 Committing changes...
+# ✅ Successfully committed changes!
+```
+
+### Setting Up Aliases
+
+```bash
+# Add to your shell profile
+echo 'alias ag="git add . && genius"' >> ~/.zshrc
+echo 'alias magic="git add . && genius"' >> ~/.zshrc
+
+# Reload your shell
+source ~/.zshrc
+```
+
 ## Available Gemini Models
 
 The tool supports multiple Gemini 2.5 models with different capabilities:
