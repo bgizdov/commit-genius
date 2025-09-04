@@ -158,15 +158,23 @@ For even faster workflow, you can create shell aliases that combine `git add .` 
 Add any of these to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.):
 
 ```bash
-# Short and sweet
+# Stage and commit only
 alias ag="git add . && genius"          # "add genius"
 alias gadd="git add . && genius"        # "git add genius"
-
-# Creative and memorable
 alias magic="git add . && genius"       # Magic commit
 alias brain="git add . && genius"       # Brain-powered commit
 alias ai="git add . && genius"          # AI commit
 alias zen="git add . && genius"         # Zen commit
+
+# Stage, commit, and push (full workflow)
+alias agp="git add . && genius && git push"      # "add genius push"
+alias gaddp="git add . && genius && git push"    # "git add genius push"
+alias ship="git add . && genius && git push"     # Ship it!
+alias deploy="git add . && genius && git push"   # Deploy changes
+alias rocket="git add . && genius && git push"   # Rocket to production
+alias publish="git add . && genius && git push"  # Publish changes
+alias deliver="git add . && genius && git push"  # Deliver changes
+alias launch="git add . && genius && git push"   # Launch changes
 ```
 
 ### Usage with Aliases
