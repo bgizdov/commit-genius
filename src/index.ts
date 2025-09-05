@@ -20,7 +20,16 @@ interface Config {
   autoPrefixFromBranch?: boolean;
 }
 
+// Cache config to avoid loading multiple times per execution
+let cachedConfig: Config | null = null;
+let configLoaded = false;
+
 function loadGlobalConfig(): Config {
+  // Return cached config if already loaded
+  if (configLoaded) {
+    return cachedConfig || {};
+  }
+
   const configPaths = [
     path.join(os.homedir(), '.commit-genius.json'),
     path.join(os.homedir(), '.config', 'commit-genius', 'config.json'),
@@ -33,6 +42,10 @@ function loadGlobalConfig(): Config {
         const configContent = fs.readFileSync(configPath, 'utf8');
         const config = JSON.parse(configContent);
         console.log(`📄 Using config from: ${configPath}`);
+
+        // Cache the loaded config
+        cachedConfig = config;
+        configLoaded = true;
         return config;
       }
     } catch (error) {
@@ -40,6 +53,9 @@ function loadGlobalConfig(): Config {
     }
   }
 
+  // Cache empty config if no file found
+  cachedConfig = {};
+  configLoaded = true;
   return {};
 }
 
