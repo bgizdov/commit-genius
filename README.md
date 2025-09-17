@@ -8,6 +8,7 @@ A TypeScript-based command-line tool that generates AI-powered commit messages u
 - 📝 **Conventional Commits**: Follows conventional commit message format (type(scope): description)
 - 🔍 **Context Aware**: Analyzes your actual git diff to understand what changed
 - 📝 **Staged Notes**: Add contextual notes for richer commit messages that explain "why"
+- 🤔 **Interactive Mode**: Guided prompts for adding context with `--interactive`
 - 🔄 **Regenerate**: Improve existing commit messages with `--regenerate`
 - ⚡ **Fast & Simple**: One command to generate and commit
 - 🛡️ **Type Safe**: Built with TypeScript for reliability
@@ -116,6 +117,10 @@ genius
 # Dry run - generate message without committing
 genius --dry-run
 genius -d
+
+# Interactive mode - guided prompts for context
+genius --interactive
+genius -i
 
 # Use specific Gemini model
 genius --model gemini-2.5-pro

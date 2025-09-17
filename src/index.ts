@@ -164,6 +164,94 @@ async function amendCommitMessage(newMessage: string): Promise<void> {
   }
 }
 
+async function promptForContext(): Promise<void> {
+  console.log('\n🤔 Interactive mode: Let\'s add context to make your commit message more meaningful!');
+  console.log('💡 This helps explain WHY the change was made, not just WHAT changed.');
+  console.log('📝 Press Enter to skip any question, or type "done" to finish early.\n');
+
+  const prompts = [
+    {
+      key: 'problem',
+      question: '❓ What issue or problem does this change solve?',
+      example: 'e.g., "Fixes login timeout for enterprise users"'
+    },
+    {
+      key: 'environment',
+      question: '🎯 Which browser, environment, or system is affected?',
+      example: 'e.g., "Chrome on macOS", "Production environment", "Mobile Safari"'
+    },
+    {
+      key: 'references',
+      question: '🔗 Any issue numbers, tickets, or references?',
+      example: 'e.g., "Resolves #456", "Closes JIRA-1234", "See upstream bug #789"'
+    },
+    {
+      key: 'business',
+      question: '💼 Any business context or reasoning?',
+      example: 'e.g., "Critical for Q4 launch", "Customer requirement", "Security compliance"'
+    },
+    {
+      key: 'technical',
+      question: '🔧 Any technical details worth noting?',
+      example: 'e.g., "Temporary workaround until upstream fix", "Breaking change", "Performance improvement"'
+    }
+  ];
+
+  let contextAdded = 0;
+
+  for (const prompt of prompts) {
+    console.log(`${prompt.question}`);
+    console.log(`   ${prompt.example}`);
+    process.stdout.write('   > ');
+
+    try {
+      // Use a more robust approach for reading input
+      const answer = await readUserInput();
+
+      if (answer.toLowerCase() === 'done') {
+        console.log('✋ Finishing interactive mode early.\n');
+        break;
+      }
+
+      if (answer && answer.trim().length > 0) {
+        await addStagedNote(answer.trim());
+        contextAdded++;
+        console.log('   ✅ Added!\n');
+      } else {
+        console.log('   ⏭️  Skipped.\n');
+      }
+    } catch (error) {
+      console.log('   ❌ Error reading input, skipping.\n');
+    }
+  }
+
+  if (contextAdded > 0) {
+    console.log(`🎉 Added ${contextAdded} context note${contextAdded > 1 ? 's' : ''}! This will help generate a more meaningful commit message.\n`);
+  } else {
+    console.log('ℹ️  No context added - proceeding with diff-only analysis.\n');
+  }
+}
+
+async function readUserInput(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Input timeout'));
+    }, 30000); // 30 second timeout
+
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+
+    const onData = (data: string) => {
+      clearTimeout(timeout);
+      process.stdin.pause();
+      process.stdin.removeListener('data', onData);
+      resolve(data.toString().trim());
+    };
+
+    process.stdin.once('data', onData);
+  });
+}
+
 function loadGlobalConfig(): Config {
   // Return cached config if already loaded
   if (configLoaded) {
@@ -389,6 +477,7 @@ interface CommitMessageOptions {
   clearNotes?: boolean;
   debug?: boolean;
   regenerate?: boolean;
+  interactive?: boolean;
 }
 
 class AICommitGenerator {
@@ -625,6 +714,11 @@ Commit message:`;
         process.exit(1);
       }
 
+      // Handle interactive mode
+      if (options.interactive) {
+        await promptForContext();
+      }
+
       // Show staged notes if any exist
       const stagedNotes = await loadStagedNotes();
       if (stagedNotes.length > 0) {
@@ -680,6 +774,7 @@ async function main() {
   const listNotes = args.includes('--list-notes');
   const clearNotes = args.includes('--clear-notes');
   const regenerate = args.includes('--regenerate') || args.includes('-r');
+  const interactive = args.includes('--interactive') || args.includes('-i');
 
   // Parse model option (CLI flag takes precedence over env var)
   const modelIndex = args.findIndex(arg => arg === '--model' || arg === '-m');
@@ -733,6 +828,7 @@ Options:
   --model, -m <model>   Specify Gemini model to use (default: gemini-2.5-flash-lite)
   --prefix, -p <prefix> Prepend prefix to commit message (e.g., JR-1234)
   --note, -n <message>  Add contextual note for commit message generation
+  --interactive, -i     Interactive mode: prompts for context before generating
   --list-notes          Show all staged notes
   --clear-notes         Clear all staged notes
   --regenerate, -r      Regenerate and amend the last commit message
@@ -765,6 +861,7 @@ Prefix Configuration:
 Staged Notes System:
   genius --note "Fix browser bug in Chrome"           # Add context note
   genius --note "See upstream issue: github.com/..."  # Add reference
+  genius --interactive                                # Interactive mode: guided prompts
   genius --list-notes                                 # View all notes
   genius                                              # Generate commit with notes
   genius --clear-notes                                # Clear all notes
@@ -772,10 +869,12 @@ Staged Notes System:
 Examples:
   genius                                 # Auto-detect prefix from branch, use default model
   genius --dry-run                       # Generate message only
+  genius --interactive                   # Interactive mode with guided prompts
   genius --prefix "JR-1234"              # Add specific prefix to this commit
   genius --model gemini-2.5-pro         # Override with Pro model
   genius -p "PROJ-567" -m gemini-2.5-pro # Custom prefix and model for this commit
   genius -n "Pinning due to v1.0.1 bug" # Add context note and commit
+  genius -i -d                           # Interactive mode with dry run
   genius --regenerate                    # Regenerate and amend last commit message
   genius -r --dry-run                    # Preview new message for last commit
   npm run commit                         # Generate and commit
@@ -813,7 +912,8 @@ Examples:
     note,
     listNotes,
     clearNotes,
-    regenerate
+    regenerate,
+    interactive
   });
 }
 
