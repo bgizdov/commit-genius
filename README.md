@@ -7,6 +7,8 @@ A TypeScript-based command-line tool that generates AI-powered commit messages u
 - 🤖 **AI-Powered**: Uses Google Gemini 2.5 models to generate contextually relevant commit messages
 - 📝 **Conventional Commits**: Follows conventional commit message format (type(scope): description)
 - 🔍 **Context Aware**: Analyzes your actual git diff to understand what changed
+- 📝 **Staged Notes**: Add contextual notes for richer commit messages that explain "why"
+- 🔄 **Regenerate**: Improve existing commit messages with `--regenerate`
 - ⚡ **Fast & Simple**: One command to generate and commit
 - 🛡️ **Type Safe**: Built with TypeScript for reliability
 - 🔧 **Configurable**: Supports dry-run mode and various options

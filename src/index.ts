@@ -133,6 +133,37 @@ async function listStagedNotes(): Promise<void> {
   });
 }
 
+async function getLastCommitInfo(): Promise<{ diff: string; message: string; hash: string }> {
+  try {
+    // Get the last commit hash
+    const { stdout: hash } = await execAsync('git rev-parse HEAD');
+    const commitHash = hash.trim();
+
+    // Get the last commit message
+    const { stdout: message } = await execAsync('git log -1 --pretty=format:"%s"');
+    const commitMessage = message.trim().replace(/^"|"$/g, ''); // Remove quotes
+
+    // Get the diff for the last commit
+    const { stdout: diff } = await execAsync('git show --no-merges --format="" HEAD');
+
+    return {
+      diff: diff.trim(),
+      message: commitMessage,
+      hash: commitHash.substring(0, 8) // Short hash
+    };
+  } catch (error) {
+    throw new Error(`Failed to get last commit info: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
+async function amendCommitMessage(newMessage: string): Promise<void> {
+  try {
+    await execAsync(`git commit --amend -m "${newMessage}"`);
+  } catch (error) {
+    throw new Error(`Failed to amend commit message: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
 function loadGlobalConfig(): Config {
   // Return cached config if already loaded
   if (configLoaded) {
@@ -357,6 +388,7 @@ interface CommitMessageOptions {
   listNotes?: boolean;
   clearNotes?: boolean;
   debug?: boolean;
+  regenerate?: boolean;
 }
 
 class AICommitGenerator {
@@ -533,6 +565,56 @@ Commit message:`;
         return;
       }
 
+      // Handle regenerate last commit message
+      if (options.regenerate) {
+        console.log('🔄 Regenerating last commit message...');
+
+        const lastCommit = await getLastCommitInfo();
+        console.log(`📋 Current commit message: "${lastCommit.message}"`);
+        console.log(`🔍 Commit hash: ${lastCommit.hash}`);
+
+        // Show staged notes if any exist
+        const stagedNotes = await loadStagedNotes();
+        if (stagedNotes.length > 0) {
+          console.log(`📝 Using ${stagedNotes.length} staged note${stagedNotes.length > 1 ? 's' : ''} for context`);
+        }
+
+        console.log('🤖 Generating new commit message with AI...');
+
+        let newCommitMessage = await this.generateCommitMessage(lastCommit.diff);
+
+        // Get prefix and apply it to the commit message
+        const prefix = await getPrefix(options.prefix);
+        const config = loadGlobalConfig();
+        const prefixFormat = config.prefixFormat || 'brackets';
+
+        const finalMessage = formatCommitMessage(newCommitMessage, prefix, prefixFormat);
+
+        console.log('\n📝 New commit message:');
+        console.log(`   ${finalMessage}`);
+
+        if (prefix) {
+          console.log(`🏷️  Applied prefix: ${prefix} (format: ${prefixFormat})`);
+        }
+
+        if (options.dryRun) {
+          console.log('\n🔍 Dry run mode - not amending commit');
+          return;
+        }
+
+        console.log('\n🔄 Amending last commit...');
+        await amendCommitMessage(finalMessage);
+
+        // Clear staged notes after successful amendment
+        if (stagedNotes.length > 0) {
+          await clearStagedNotes();
+          console.log('🗑️  Cleared staged notes after successful amendment');
+        }
+
+        console.log('✅ Successfully amended last commit message!');
+        return;
+      }
+
       console.log('🔍 Checking for staged changes...');
 
       const diff = await this.checkStagedChanges();
@@ -597,6 +679,7 @@ async function main() {
   const init = args.includes('--init');
   const listNotes = args.includes('--list-notes');
   const clearNotes = args.includes('--clear-notes');
+  const regenerate = args.includes('--regenerate') || args.includes('-r');
 
   // Parse model option (CLI flag takes precedence over env var)
   const modelIndex = args.findIndex(arg => arg === '--model' || arg === '-m');
@@ -652,6 +735,7 @@ Options:
   --note, -n <message>  Add contextual note for commit message generation
   --list-notes          Show all staged notes
   --clear-notes         Clear all staged notes
+  --regenerate, -r      Regenerate and amend the last commit message
   --init                Create global config file (~/.commit-genius.json)
   --help, -h            Show this help message
 
@@ -692,6 +776,8 @@ Examples:
   genius --model gemini-2.5-pro         # Override with Pro model
   genius -p "PROJ-567" -m gemini-2.5-pro # Custom prefix and model for this commit
   genius -n "Pinning due to v1.0.1 bug" # Add context note and commit
+  genius --regenerate                    # Regenerate and amend last commit message
+  genius -r --dry-run                    # Preview new message for last commit
   npm run commit                         # Generate and commit
 `);
     return;
@@ -726,7 +812,8 @@ Examples:
     prefix: cliPrefix,
     note,
     listNotes,
-    clearNotes
+    clearNotes,
+    regenerate
   });
 }
 
