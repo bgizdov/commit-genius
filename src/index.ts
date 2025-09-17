@@ -277,6 +277,60 @@ function formatCommitMessage(message: string, prefix: string | null, format: 'br
   }
 }
 
+function getBannerSetting(cliBanner?: boolean): boolean {
+  // Precedence: CLI flag > env var > config file > default (true)
+
+  // 1. CLI flag (highest priority)
+  if (cliBanner !== undefined) {
+    return cliBanner;
+  }
+
+  // 2. Environment variable
+  const envBanner = process.env.COMMIT_GENIUS_BANNER;
+  if (envBanner !== undefined) {
+    return envBanner.toLowerCase() === 'true';
+  }
+
+  // 3. Config file
+  const config = loadGlobalConfig();
+  if (config.banner !== undefined) {
+    return config.banner;
+  }
+
+  // 4. Default to true (enabled)
+  return true;
+}
+
+function getBannerText(): string {
+  // Precedence: env var > config file > default
+
+  // 1. Environment variable
+  const envBannerText = process.env.COMMIT_GENIUS_BANNER_TEXT;
+  if (envBannerText) {
+    return envBannerText;
+  }
+
+  // 2. Config file
+  const config = loadGlobalConfig();
+  if (config.bannerText) {
+    return config.bannerText;
+  }
+
+  // 3. Default banner text
+  return '🤖 AI-powered commit by commit-genius https://github.com/bgizdov/commit-genius';
+}
+
+function addBannerToMessage(message: string, addBanner: boolean): string {
+  if (!addBanner || !message.trim()) {
+    return message;
+  }
+
+  const bannerText = getBannerText();
+
+  // Add banner with a blank line separator following git commit message conventions
+  return `${message}\n\n${bannerText}`;
+}
+
 function createGlobalConfig(apiKey: string, model?: string): void {
   const configPath = path.join(os.homedir(), '.commit-genius.json');
   const config: Config = {
@@ -569,7 +623,13 @@ async function main() {
     console.log('  "apiKey": "your_gemini_api_key_here",');
     console.log('  "model": "gemini-2.5-flash-lite",');
     console.log('  "prefixFormat": "brackets",');
+<<<<<<< HEAD
     console.log('  "autoPrefixFromBranch": true');
+=======
+    console.log('  "autoPrefixFromBranch": true,');
+    console.log('  "banner": true,');
+    console.log('  "bannerText": "🤖 AI-powered commit by commit-genius https://github.com/bgizdov/commit-genius"');
+>>>>>>> 175f163 (feat(banner): add configurable commit banner)
     console.log('}');
     console.log('');
     console.log('Note: Prefixes are dynamic per commit, not stored in config.');

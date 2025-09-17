@@ -255,6 +255,52 @@ genius                                 # Uses gemini-2.5-pro (from .env)
 genius --model gemini-2.5-flash       # Overrides to use flash model
 ```
 
+## Banner Configuration
+
+By default, commit-genius adds a banner to commit messages to give credit to the tool:
+
+```
+feat: add user authentication
+
+🤖 AI-powered commit by commit-genius https://github.com/bgizdov/commit-genius
+```
+
+### Banner Control
+
+You can control the banner in three ways, with the following precedence order:
+
+1. **CLI Flag** (highest priority): `--banner` or `--no-banner`
+2. **Environment Variable**: `COMMIT_GENIUS_BANNER=true/false`
+3. **Config File**: `"banner": true/false` in `~/.commit-genius.json`
+4. **Default**: `true` (banner enabled)
+
+### Examples
+
+```bash
+# Disable banner for this commit
+genius --no-banner
+
+# Explicitly enable banner (default behavior)
+genius --banner
+
+# Set environment variable to disable by default
+export COMMIT_GENIUS_BANNER=false
+
+# Custom banner text via environment variable
+export COMMIT_GENIUS_BANNER_TEXT="Generated with AI assistance"
+```
+
+### Config File Banner Settings
+
+```json
+{
+  "apiKey": "your_api_key_here",
+  "model": "gemini-2.5-flash-lite",
+  "banner": true,
+  "bannerText": "🤖 AI-powered commit by commit-genius https://github.com/bgizdov/commit-genius"
+}
+```
+
 ## How It Works
 
 1. **Checks for staged changes** using `git diff --cached`

@@ -40,7 +40,9 @@ EOF
 ```json
 {
   "apiKey": "your_gemini_api_key_here",
-  "model": "gemini-2.5-flash-lite"
+  "model": "gemini-2.5-flash-lite",
+  "banner": true,
+  "bannerText": "🤖 AI-powered commit by commit-genius https://github.com/bgizdov/commit-genius"
 }
 ```
 
@@ -56,6 +58,8 @@ EOF
 ```bash
 export COMMIT_GENIUS_API_KEY="your_api_key_here"
 export COMMIT_GENIUS_MODEL="gemini-2.5-pro"
+export COMMIT_GENIUS_BANNER="true"
+export COMMIT_GENIUS_BANNER_TEXT="🤖 AI-powered commit by commit-genius https://github.com/bgizdov/commit-genius"
 ```
 
 ### Legacy (Still Supported)

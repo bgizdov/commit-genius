@@ -2,5 +2,7 @@
   "apiKey": "test_api_key_here",
   "model": "gemini-2.5-flash-lite",
   "prefixFormat": "brackets",
-  "autoPrefixFromBranch": true
+  "autoPrefixFromBranch": true,
+  "banner": true,
+  "bannerText": "🤖 AI-powered commit by commit-genius https://github.com/bgizdov/commit-genius"
 }
