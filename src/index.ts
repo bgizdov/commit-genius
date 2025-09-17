@@ -302,6 +302,7 @@ interface CommitMessageOptions {
   note?: string;
   listNotes?: boolean;
   clearNotes?: boolean;
+  debug?: boolean;
 }
 
 class AICommitGenerator {
@@ -392,11 +393,17 @@ Note: This is a very large commit. The commit message is generated based on file
     if (stagedNotes.length > 0) {
       contextSection = `
 
-ADDITIONAL CONTEXT FROM DEVELOPER NOTES:
-${stagedNotes.map(note => `- ${note.message}`).join('\n')}
+=== IMPORTANT: DEVELOPER CONTEXT NOTES ===
+${stagedNotes.map(note => `• ${note.message}`).join('\n')}
 
-Use this context to write a more meaningful commit message that explains WHY the change was made, not just WHAT changed.
-Include relevant information from the notes to provide business context, issue references, or technical reasoning.`;
+INSTRUCTIONS: Use this context to write a meaningful commit message that explains WHY the change was made.
+Include specific details from the notes such as:
+- Browser/environment issues (e.g., "Chrome bug", "production crash")
+- Issue references (e.g., "Resolves #456", "upstream bug #123")
+- Business reasoning (e.g., "for enterprise customers", "critical for Q4 launch")
+- Technical context (e.g., "until upstream fix", "temporary workaround")
+=== END CONTEXT ===
+`;
     }
 
     const prompt = `
@@ -410,13 +417,13 @@ ${isFileSummary ?
 Rules:
 1. Use conventional commit format: type(scope): description
 2. Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build
-3. Keep the description under 50 characters for the first line
+3. ${stagedNotes.length > 0 ? 'When developer notes are provided, prioritize explaining WHY over brevity - include key context like browser issues, upstream bugs, or business reasoning' : 'Keep the description under 50 characters for the first line'}
 4. Be specific about what changed based on ${isFileSummary ? 'file names and change types' : 'the actual code changes'}
 5. Use present tense ("add" not "added")
 6. Don't include "git commit -m" or quotes
 7. Return ONLY the commit message, nothing else
 8. ${isFileSummary ? 'Focus on the overall purpose based on file patterns (e.g., "docs: add README files", "feat: add new components")' : 'Focus on the specific code changes'}
-${stagedNotes.length > 0 ? '9. Incorporate context from developer notes to explain the reasoning behind the change' : ''}
+${stagedNotes.length > 0 ? '9. IMPORTANT: Incorporate context from developer notes to explain the reasoning behind the change - include issue references, browser/environment details, and business context' : ''}
 
 ${isFileSummary ? 'File changes and statistics:' : 'Git diff:'}
 ${diff}
@@ -424,6 +431,13 @@ ${diff}
 Commit message:`;
 
     try {
+      // Debug: log the full prompt if debug mode is enabled
+      if (process.env.DEBUG_PROMPT === 'true') {
+        console.log('\n=== DEBUG: Full AI Prompt ===');
+        console.log(prompt);
+        console.log('=== END DEBUG ===\n');
+      }
+
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text().trim();
