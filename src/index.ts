@@ -20,9 +20,118 @@ interface Config {
   autoPrefixFromBranch?: boolean;
 }
 
+interface StagedNote {
+  message: string;
+  timestamp: Date;
+}
+
+interface StagedNotes {
+  notes: StagedNote[];
+  repository: string;
+}
+
 // Cache config to avoid loading multiple times per execution
 let cachedConfig: Config | null = null;
 let configLoaded = false;
+
+// Staged Notes System
+async function getNotesFilePath(): Promise<string> {
+  try {
+    const { stdout } = await execAsync('git rev-parse --git-dir');
+    const gitDir = stdout.trim();
+    return path.join(gitDir, 'commit-genius-notes.json');
+  } catch (error) {
+    throw new Error('Not in a git repository. Staged notes require a git repository.');
+  }
+}
+
+async function getCurrentRepoPath(): Promise<string> {
+  try {
+    const { stdout } = await execAsync('git rev-parse --show-toplevel');
+    return stdout.trim();
+  } catch (error) {
+    throw new Error('Not in a git repository.');
+  }
+}
+
+async function loadStagedNotes(): Promise<StagedNote[]> {
+  try {
+    const notesFilePath = await getNotesFilePath();
+    const currentRepo = await getCurrentRepoPath();
+
+    if (!fs.existsSync(notesFilePath)) {
+      return [];
+    }
+
+    const notesContent = fs.readFileSync(notesFilePath, 'utf8');
+    const stagedNotes: StagedNotes = JSON.parse(notesContent);
+
+    // Verify notes are for current repository
+    if (stagedNotes.repository !== currentRepo) {
+      return [];
+    }
+
+    return stagedNotes.notes || [];
+  } catch (error) {
+    return [];
+  }
+}
+
+async function saveStagedNotes(notes: StagedNote[]): Promise<void> {
+  try {
+    const notesFilePath = await getNotesFilePath();
+    const currentRepo = await getCurrentRepoPath();
+
+    const stagedNotes: StagedNotes = {
+      notes,
+      repository: currentRepo
+    };
+
+    fs.writeFileSync(notesFilePath, JSON.stringify(stagedNotes, null, 2));
+  } catch (error) {
+    throw new Error(`Failed to save staged notes: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
+async function addStagedNote(message: string): Promise<void> {
+  const notes = await loadStagedNotes();
+  const newNote: StagedNote = {
+    message: message.trim(),
+    timestamp: new Date()
+  };
+
+  notes.push(newNote);
+  await saveStagedNotes(notes);
+  console.log(`📝 Added note: ${message}`);
+}
+
+async function clearStagedNotes(): Promise<void> {
+  try {
+    const notesFilePath = await getNotesFilePath();
+    if (fs.existsSync(notesFilePath)) {
+      fs.unlinkSync(notesFilePath);
+    }
+    console.log('🗑️  Cleared all staged notes');
+  } catch (error) {
+    throw new Error(`Failed to clear staged notes: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
+async function listStagedNotes(): Promise<void> {
+  const notes = await loadStagedNotes();
+
+  if (notes.length === 0) {
+    console.log('📝 No staged notes found');
+    return;
+  }
+
+  console.log('📝 Staged notes:');
+  notes.forEach((note, index) => {
+    const timestamp = new Date(note.timestamp).toLocaleString();
+    console.log(`   ${index + 1}. ${note.message}`);
+    console.log(`      (added: ${timestamp})`);
+  });
+}
 
 function loadGlobalConfig(): Config {
   // Return cached config if already loaded
@@ -190,6 +299,9 @@ interface CommitMessageOptions {
   dryRun?: boolean;
   model?: string;
   prefix?: string;
+  note?: string;
+  listNotes?: boolean;
+  clearNotes?: boolean;
 }
 
 class AICommitGenerator {
@@ -274,6 +386,18 @@ Note: This is a very large commit. The commit message is generated based on file
 
   async generateCommitMessage(diff: string): Promise<string> {
     const isFileSummary = diff.includes('Files changed:') || diff.includes('Note: This is a');
+    const stagedNotes = await loadStagedNotes();
+
+    let contextSection = '';
+    if (stagedNotes.length > 0) {
+      contextSection = `
+
+ADDITIONAL CONTEXT FROM DEVELOPER NOTES:
+${stagedNotes.map(note => `- ${note.message}`).join('\n')}
+
+Use this context to write a more meaningful commit message that explains WHY the change was made, not just WHAT changed.
+Include relevant information from the notes to provide business context, issue references, or technical reasoning.`;
+    }
 
     const prompt = `
 You are an expert developer who writes clear, concise commit messages following conventional commit format.
@@ -281,7 +405,7 @@ You are an expert developer who writes clear, concise commit messages following 
 ${isFileSummary ?
   'Analyze the following file changes and statistics to generate a single, well-formatted commit message.' :
   'Analyze the following git diff and generate a single, well-formatted commit message.'
-}
+}${contextSection}
 
 Rules:
 1. Use conventional commit format: type(scope): description
@@ -292,6 +416,7 @@ Rules:
 6. Don't include "git commit -m" or quotes
 7. Return ONLY the commit message, nothing else
 8. ${isFileSummary ? 'Focus on the overall purpose based on file patterns (e.g., "docs: add README files", "feat: add new components")' : 'Focus on the specific code changes'}
+${stagedNotes.length > 0 ? '9. Incorporate context from developer notes to explain the reasoning behind the change' : ''}
 
 ${isFileSummary ? 'File changes and statistics:' : 'Git diff:'}
 ${diff}
@@ -302,11 +427,11 @@ Commit message:`;
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text().trim();
-      
+
       // Clean up the response to ensure it's just the commit message
       const lines = text.split('\n');
       const commitMessage = lines[0].trim();
-      
+
       // Remove any potential quotes or prefixes
       return commitMessage.replace(/^["']|["']$/g, '').replace(/^git commit -m\s*/, '');
     } catch (error) {
@@ -324,6 +449,22 @@ Commit message:`;
 
   async run(options: CommitMessageOptions = {}): Promise<void> {
     try {
+      // Handle note operations first
+      if (options.note) {
+        await addStagedNote(options.note);
+        return;
+      }
+
+      if (options.listNotes) {
+        await listStagedNotes();
+        return;
+      }
+
+      if (options.clearNotes) {
+        await clearStagedNotes();
+        return;
+      }
+
       console.log('🔍 Checking for staged changes...');
 
       const diff = await this.checkStagedChanges();
@@ -332,6 +473,12 @@ Commit message:`;
         console.log('❌ No staged changes found. Please stage your changes first with:');
         console.log('   git add <files>');
         process.exit(1);
+      }
+
+      // Show staged notes if any exist
+      const stagedNotes = await loadStagedNotes();
+      if (stagedNotes.length > 0) {
+        console.log(`📝 Using ${stagedNotes.length} staged note${stagedNotes.length > 1 ? 's' : ''} for context`);
       }
 
       console.log('🤖 Generating commit message with AI...');
@@ -360,6 +507,12 @@ Commit message:`;
       console.log('\n🚀 Committing changes...');
       await this.commitChanges(finalMessage);
 
+      // Clear staged notes after successful commit
+      if (stagedNotes.length > 0) {
+        await clearStagedNotes();
+        console.log('🗑️  Cleared staged notes after successful commit');
+      }
+
       console.log('✅ Successfully committed changes!');
 
     } catch (error) {
@@ -374,6 +527,8 @@ async function main() {
   const dryRun = args.includes('--dry-run') || args.includes('-d');
   const help = args.includes('--help') || args.includes('-h');
   const init = args.includes('--init');
+  const listNotes = args.includes('--list-notes');
+  const clearNotes = args.includes('--clear-notes');
 
   // Parse model option (CLI flag takes precedence over env var)
   const modelIndex = args.findIndex(arg => arg === '--model' || arg === '-m');
@@ -382,6 +537,10 @@ async function main() {
   // Parse prefix option
   const prefixIndex = args.findIndex(arg => arg === '--prefix' || arg === '-p');
   const cliPrefix = prefixIndex !== -1 && args[prefixIndex + 1] ? args[prefixIndex + 1] : undefined;
+
+  // Parse note option
+  const noteIndex = args.findIndex(arg => arg === '--note' || arg === '-n');
+  const note = noteIndex !== -1 && args[noteIndex + 1] ? args[noteIndex + 1] : undefined;
 
   if (init) {
     console.log('🔧 Creating global config file...');
@@ -416,6 +575,9 @@ Options:
   --dry-run, -d         Generate commit message without committing
   --model, -m <model>   Specify Gemini model to use (default: gemini-2.5-flash-lite)
   --prefix, -p <prefix> Prepend prefix to commit message (e.g., JR-1234)
+  --note, -n <message>  Add contextual note for commit message generation
+  --list-notes          Show all staged notes
+  --clear-notes         Clear all staged notes
   --init                Create global config file (~/.commit-genius.json)
   --help, -h            Show this help message
 
@@ -442,12 +604,20 @@ Prefix Configuration:
   Branch detection         Automatic extraction from branch names
   No static config         Prefixes are dynamic, not stored in config files
 
+Staged Notes System:
+  genius --note "Fix browser bug in Chrome"           # Add context note
+  genius --note "See upstream issue: github.com/..."  # Add reference
+  genius --list-notes                                 # View all notes
+  genius                                              # Generate commit with notes
+  genius --clear-notes                                # Clear all notes
+
 Examples:
   genius                                 # Auto-detect prefix from branch, use default model
   genius --dry-run                       # Generate message only
   genius --prefix "JR-1234"              # Add specific prefix to this commit
   genius --model gemini-2.5-pro         # Override with Pro model
   genius -p "PROJ-567" -m gemini-2.5-pro # Custom prefix and model for this commit
+  genius -n "Pinning due to v1.0.1 bug" # Add context note and commit
   npm run commit                         # Generate and commit
 `);
     return;
@@ -476,7 +646,14 @@ Examples:
   }
 
   const generator = new AICommitGenerator(apiKey, model);
-  await generator.run({ dryRun, model, prefix: cliPrefix });
+  await generator.run({
+    dryRun,
+    model,
+    prefix: cliPrefix,
+    note,
+    listNotes,
+    clearNotes
+  });
 }
 
 // Run the main function
