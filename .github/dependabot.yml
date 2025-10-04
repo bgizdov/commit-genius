@@ -14,3 +14,7 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
+    ignore:
+      # Ignore Node.js major version updates beyond v22
+      - dependency-name: "node"
+        versions: [">=23.0.0"]
