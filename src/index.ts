@@ -18,6 +18,8 @@ interface Config {
   model?: string;
   prefixFormat?: 'brackets' | 'colon';
   autoPrefixFromBranch?: boolean;
+  banner?: boolean;
+  bannerText?: string;
 }
 
 interface StagedNote {
@@ -801,13 +803,9 @@ async function main() {
     console.log('  "apiKey": "your_gemini_api_key_here",');
     console.log('  "model": "gemini-2.5-flash-lite",');
     console.log('  "prefixFormat": "brackets",');
-<<<<<<< HEAD
-    console.log('  "autoPrefixFromBranch": true');
-=======
     console.log('  "autoPrefixFromBranch": true,');
     console.log('  "banner": true,');
     console.log('  "bannerText": "🤖 AI-powered commit by commit-genius https://github.com/bgizdov/commit-genius"');
->>>>>>> 175f163 (feat(banner): add configurable commit banner)
     console.log('}');
     console.log('');
     console.log('Note: Prefixes are dynamic per commit, not stored in config.');
