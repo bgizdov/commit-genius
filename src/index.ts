@@ -480,6 +480,7 @@ interface CommitMessageOptions {
   debug?: boolean;
   regenerate?: boolean;
   interactive?: boolean;
+  banner?: boolean;
 }
 
 class AICommitGenerator {
@@ -679,13 +680,21 @@ Commit message:`;
         const config = loadGlobalConfig();
         const prefixFormat = config.prefixFormat || 'brackets';
 
-        const finalMessage = formatCommitMessage(newCommitMessage, prefix, prefixFormat);
+        let finalMessage = formatCommitMessage(newCommitMessage, prefix, prefixFormat);
+
+        // Apply banner if enabled
+        const bannerEnabled = getBannerSetting(options.banner);
+        finalMessage = addBannerToMessage(finalMessage, bannerEnabled);
 
         console.log('\n📝 New commit message:');
         console.log(`   ${finalMessage}`);
 
         if (prefix) {
           console.log(`🏷️  Applied prefix: ${prefix} (format: ${prefixFormat})`);
+        }
+
+        if (bannerEnabled) {
+          console.log('🏷️  Banner will be added to commit message');
         }
 
         if (options.dryRun) {
@@ -736,13 +745,21 @@ Commit message:`;
       const config = loadGlobalConfig();
       const prefixFormat = config.prefixFormat || 'brackets';
 
-      const finalMessage = formatCommitMessage(commitMessage, prefix, prefixFormat);
+      let finalMessage = formatCommitMessage(commitMessage, prefix, prefixFormat);
+
+      // Apply banner if enabled
+      const bannerEnabled = getBannerSetting(options.banner);
+      finalMessage = addBannerToMessage(finalMessage, bannerEnabled);
 
       console.log('\n📝 Generated commit message:');
       console.log(`   ${finalMessage}`);
 
       if (prefix) {
         console.log(`🏷️  Applied prefix: ${prefix} (format: ${prefixFormat})`);
+      }
+
+      if (bannerEnabled) {
+        console.log('🏷️  Banner will be added to commit message');
       }
 
       if (options.dryRun) {
@@ -777,6 +794,14 @@ async function main() {
   const clearNotes = args.includes('--clear-notes');
   const regenerate = args.includes('--regenerate') || args.includes('-r');
   const interactive = args.includes('--interactive') || args.includes('-i');
+
+  // Parse banner option (CLI flag takes precedence)
+  let cliBanner: boolean | undefined = undefined;
+  if (args.includes('--banner')) {
+    cliBanner = true;
+  } else if (args.includes('--no-banner')) {
+    cliBanner = false;
+  }
 
   // Parse model option (CLI flag takes precedence over env var)
   const modelIndex = args.findIndex(arg => arg === '--model' || arg === '-m');
@@ -830,6 +855,8 @@ Options:
   --list-notes          Show all staged notes
   --clear-notes         Clear all staged notes
   --regenerate, -r      Regenerate and amend the last commit message
+  --banner              Enable banner in commit message (default: enabled)
+  --no-banner           Disable banner in commit message
   --init                Create global config file (~/.commit-genius.json)
   --help, -h            Show this help message
 
@@ -911,7 +938,8 @@ Examples:
     listNotes,
     clearNotes,
     regenerate,
-    interactive
+    interactive,
+    banner: cliBanner
   });
 }
 
